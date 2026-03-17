@@ -1,23 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>GeoJSON Viewer</title>
+  <title>Free GeoJSON Viewer</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <!-- Leaflet CSS -->
+  <!-- Leaflet CSS (free & open-source) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
+
   <style>
-    html, body {
-      margin: 0;
-      height: 100%;
-      width: 100%;
-    }
-    #map {
-      height: 100vh;
-      width: 100vw;
-    }
+    html, body { margin: 0; height: 100%; width: 100%; }
+    #map { height: 100vh; width: 100vw; }
   </style>
 </head>
 <body>
@@ -25,39 +18,26 @@
 
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  
+
   <script>
-    // Extract gist ID from ?gist= parameter
+    // Get the ?gist= parameter from URL
     function getGistId() {
       const params = new URLSearchParams(window.location.search);
-      let gistParam = params.get("gist");
-      if (!gistParam) return null;
-      try {
-        const url = new URL(gistParam);
-        return url.pathname.split("/")[2]; // extract ID if full URL provided
-      } catch {
-        return gistParam;
-      }
+      return params.get("gist");
     }
 
-    // Load GeoJSON raw URL from GitHub Gist API
+    // Fetch raw GeoJSON URL from GitHub Gist API
     async function loadGeoJsonRawUrl(gistId) {
       const apiUrl = `https://api.github.com/gists/${gistId}`;
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        throw new Error("Failed to fetch Gist info");
-      }
-      const gistData = await response.json();
-      const geojsonFile = Object.values(gistData.files).find(file =>
-        file.filename.endsWith(".geojson")
-      );
-      if (!geojsonFile) {
-        throw new Error("No .geojson file found in the Gist");
-      }
-      return geojsonFile.raw_url;
+      const res = await fetch(apiUrl);
+      if (!res.ok) throw new Error("Failed to fetch Gist");
+      const gist = await res.json();
+      const geoFile = Object.values(gist.files).find(f => f.filename.endsWith(".geojson"));
+      if (!geoFile) throw new Error("No .geojson file found in the Gist");
+      return geoFile.raw_url;
     }
 
-    // Initialize the Leaflet map
+    // Initialize Leaflet map
     async function initMap() {
       const gistId = getGistId();
       if (!gistId) {
@@ -65,23 +45,22 @@
         return;
       }
 
-      const map = L.map("map").setView([34.29, -84.43], 13);
+      const map = L.map("map").setView([0,0], 2);
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      // Free OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        attribution: '' // no visible copyright
       }).addTo(map);
 
       try {
         const rawUrl = await loadGeoJsonRawUrl(gistId);
-        const geojsonResponse = await fetch(rawUrl);
-        if (!geojsonResponse.ok) throw new Error("Failed to fetch GeoJSON file");
-        const geojsonData = await geojsonResponse.json();
-        const geojsonLayer = L.geoJSON(geojsonData).addTo(map);
-        map.fitBounds(geojsonLayer.getBounds());
-      } catch (error) {
-        alert(error.message);
-        console.error(error);
+        const geojson = await fetch(rawUrl).then(r => r.json());
+        const layer = L.geoJSON(geojson).addTo(map);
+        map.fitBounds(layer.getBounds());
+      } catch (err) {
+        alert(err.message);
+        console.error(err);
       }
     }
 
