@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GeoJSON Viewer</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-sA+z7NgPkYI0cN3lT5e2sk8n7bWZiF8c7oCFES8QvqU="
+    crossorigin=""
+  />
+  <style>
+    body, html {
+      margin: 0;
+      height: 100%;
+      width: 100%;
+    }
+    #map {
+      height: 100vh;
+      width: 100vw;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-o8Y5y4aPpS1DdYXfprtxTvF2xP1BwxE9tDJXChZCW4M="
+    crossorigin=""
+  ></script>
+  <script>
+    // Extract gist ID from ?gist= parameter
+    function getGistId() {
+      const params = new URLSearchParams(window.location.search);
+      let gistParam = params.get("gist");
+      if (!gistParam) return null;
+      // If full URL is provided, extract ID from path
+      try {
+        const url = new URL(gistParam);
+        return url.pathname.split("/")[2];
+      } catch {
+        return gistParam;
+      }
+    }
+
+    // Load GeoJSON raw URL from GitHub Gist API
+    async function loadGeoJsonRawUrl(gistId) {
+      const apiUrl = `https://api.github.com/gists/${gistId}`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        throw new Error("Failed to fetch Gist info");
+      }
+      const gistData = await response.json();
+      const geojsonFile = Object.values(gistData.files).find(file =>
+        file.filename.endsWith(".geojson")
+      );
+      if (!geojsonFile) {
+        throw new Error("No .geojson file found in the Gist");
+      }
+      return geojsonFile.raw_url;
+    }
+
+    // Initialize the Leaflet map and load GeoJSON
+    async function initMap() {
+      const gistId = getGistId();
+      if (!gistId) {
+        alert("Please provide a gist ID in the URL, e.g. ?gist=YOUR_GIST_ID");
+        return;
+      }
+
+      const map = L.map("map").setView([34.29, -84.43], 13);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+
+      try {
+        const rawUrl = await loadGeoJsonRawUrl(gistId);
+        const geojsonResponse = await fetch(rawUrl);
+        if (!geojsonResponse.ok) {
+          throw new Error("Failed to fetch GeoJSON file");
+        }
+        const geojsonData = await geojsonResponse.json();
+        const geojsonLayer = L.geoJSON(geojsonData).addTo(map);
+        map.fitBounds(geojsonLayer.getBounds());
+      } catch (error) {
+        alert(error.message);
+        console.error(error);
+      }
+    }
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
