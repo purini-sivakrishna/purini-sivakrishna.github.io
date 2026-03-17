@@ -20,6 +20,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
+    let map;
+    let geoLayer; // Store the GeoJSON layer globally
+
     // Get the ?gist= parameter from URL
     function getGistId() {
       const params = new URLSearchParams(window.location.search);
@@ -45,19 +48,27 @@
         return;
       }
 
-      const map = L.map("map").setView([0,0], 2);
+      // Initialize map if not already
+      if (!map) {
+        map = L.map("map").setView([0,0], 2);
 
-      // Free OpenStreetMap tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '' // no visible copyright
-      }).addTo(map);
+        // Free OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '' // fully free / no visible copyright
+        }).addTo(map);
+      }
 
       try {
         const rawUrl = await loadGeoJsonRawUrl(gistId);
         const geojson = await fetch(rawUrl).then(r => r.json());
-        const layer = L.geoJSON(geojson).addTo(map);
-        map.fitBounds(layer.getBounds());
+
+        // Remove previous layer if it exists
+        if (geoLayer) map.removeLayer(geoLayer);
+
+        // Add GeoJSON layer and store reference globally
+        geoLayer = L.geoJSON(geojson).addTo(map);
+        map.fitBounds(geoLayer.getBounds());
       } catch (err) {
         alert(err.message);
         console.error(err);
