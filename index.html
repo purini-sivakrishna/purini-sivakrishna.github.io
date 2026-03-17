@@ -4,14 +4,12 @@
   <title>GeoJSON Viewer</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-sA+z7NgPkYI0cN3lT5e2sk8n7bWZiF8c7oCFES8QvqU="
-    crossorigin=""
-  />
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
   <style>
-    body, html {
+    html, body {
       margin: 0;
       height: 100%;
       width: 100%;
@@ -25,21 +23,18 @@
 <body>
   <div id="map"></div>
 
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-o8Y5y4aPpS1DdYXfprtxTvF2xP1BwxE9tDJXChZCW4M="
-    crossorigin=""
-  ></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  
   <script>
     // Extract gist ID from ?gist= parameter
     function getGistId() {
       const params = new URLSearchParams(window.location.search);
       let gistParam = params.get("gist");
       if (!gistParam) return null;
-      // If full URL is provided, extract ID from path
       try {
         const url = new URL(gistParam);
-        return url.pathname.split("/")[2];
+        return url.pathname.split("/")[2]; // extract ID if full URL provided
       } catch {
         return gistParam;
       }
@@ -62,7 +57,7 @@
       return geojsonFile.raw_url;
     }
 
-    // Initialize the Leaflet map and load GeoJSON
+    // Initialize the Leaflet map
     async function initMap() {
       const gistId = getGistId();
       if (!gistId) {
@@ -80,9 +75,7 @@
       try {
         const rawUrl = await loadGeoJsonRawUrl(gistId);
         const geojsonResponse = await fetch(rawUrl);
-        if (!geojsonResponse.ok) {
-          throw new Error("Failed to fetch GeoJSON file");
-        }
+        if (!geojsonResponse.ok) throw new Error("Failed to fetch GeoJSON file");
         const geojsonData = await geojsonResponse.json();
         const geojsonLayer = L.geoJSON(geojsonData).addTo(map);
         map.fitBounds(geojsonLayer.getBounds());
