@@ -6,7 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
   <!-- Leaflet CSS (free & open-source) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin="anonymous"
+  />
 
   <style>
     html, body { margin: 0; height: 100%; width: 100%; }
@@ -17,7 +21,10 @@
   <div id="map"></div>
 
   <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin="anonymous">
+  </script>
 
   <script>
     let map;
@@ -33,7 +40,7 @@
     async function loadGeoJsonRawUrl(gistId) {
       const apiUrl = `https://api.github.com/gists/${gistId}`;
       const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error("Failed to fetch Gist");
+      if (!res.ok) throw new Error("Failed to fetch Gist: " + res.status);
       const gist = await res.json();
       const geoFile = Object.values(gist.files).find(f => f.filename.endsWith(".geojson"));
       if (!geoFile) throw new Error("No .geojson file found in the Gist");
@@ -55,7 +62,7 @@
         // Free OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
-          attribution: '' // fully free / no visible copyright
+          attribution: ''
         }).addTo(map);
       }
 
@@ -70,12 +77,17 @@
         geoLayer = L.geoJSON(geojson).addTo(map);
         map.fitBounds(geoLayer.getBounds());
       } catch (err) {
-        alert(err.message);
+        alert("Error loading GeoJSON: " + err.message);
         console.error(err);
       }
     }
 
-    window.onload = initMap;
+    // Wait for Leaflet to load
+    if (window.L) {
+      window.onload = initMap;
+    } else {
+      console.error("Leaflet did not load properly.");
+    }
   </script>
 </body>
 </html>
