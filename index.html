@@ -1,15 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Free GeoJSON Viewer</title>
+  <title>Advanced GeoJSON Viewer</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  <!-- Leaflet CSS (free & open-source) -->
+
+  <!-- Leaflet CSS -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    crossorigin="anonymous"
   />
 
   <style>
@@ -18,76 +17,135 @@
   </style>
 </head>
 <body>
-  <div id="map"></div>
+<div id="map"></div>
 
-  <!-- Leaflet JS -->
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    crossorigin="anonymous">
-  </script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <script>
-    let map;
-    let geoLayer; // Store the GeoJSON layer globally
+<script>
+let map;
+let geoLayer;
 
-    // Get the ?gist= parameter from URL
-    function getGistId() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("gist");
+// Extract gist id
+function getGistId() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("gist");
+}
+
+// Fetch GeoJSON URL
+async function loadGeoJsonRawUrl(gistId) {
+  const res = await fetch(`https://api.github.com/gists/${gistId}`);
+  const gist = await res.json();
+
+  const geoFile = Object.values(gist.files)
+    .find(f => f.filename.endsWith(".geojson"));
+
+  if (!geoFile) throw new Error("No .geojson found");
+  return geoFile.raw_url;
+}
+
+// Initialize map
+async function initMap() {
+  const gistId = getGistId();
+  if (!gistId) {
+    alert("Use ?gist=YOUR_GIST_ID");
+    return;
+  }
+
+  // --- Base Layers ---
+  const osm = L.tileLayer(
+    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    { attribution: "OSM" }
+  );
+
+  const satellite = L.tileLayer(
+    'https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+    {
+      maxZoom: 20,
+      subdomains: ['mt0','mt1','mt2','mt3']
     }
+  );
 
-    // Fetch raw GeoJSON URL from GitHub Gist API
-    async function loadGeoJsonRawUrl(gistId) {
-      const apiUrl = `https://api.github.com/gists/${gistId}`;
-      const res = await fetch(apiUrl);
-      if (!res.ok) throw new Error("Failed to fetch Gist: " + res.status);
-      const gist = await res.json();
-      const geoFile = Object.values(gist.files).find(f => f.filename.endsWith(".geojson"));
-      if (!geoFile) throw new Error("No .geojson file found in the Gist");
-      return geoFile.raw_url;
+  const hybrid = L.tileLayer(
+    'https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
+    {
+      maxZoom: 20,
+      subdomains: ['mt0','mt1','mt2','mt3']
     }
+  );
 
-    // Initialize Leaflet map
-    async function initMap() {
-      const gistId = getGistId();
-      if (!gistId) {
-        alert("Please provide a gist ID in the URL, e.g. ?gist=YOUR_GIST_ID");
-        return;
+  const terrain = L.tileLayer(
+    'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
+    {
+      maxZoom: 20,
+      subdomains: ['mt0','mt1','mt2','mt3']
+    }
+  );
+
+  // Create map
+  map = L.map("map", {
+    center: [20, 0],
+    zoom: 2,
+    layers: [osm]
+  });
+
+  // Layer control
+  const baseMaps = {
+    "🗺️ Road Map": osm,
+    "🛰️ Satellite": satellite,
+    "🌍 Hybrid": hybrid,
+    "⛰️ Terrain": terrain
+  };
+
+  L.control.layers(baseMaps).addTo(map);
+
+  try {
+    const rawUrl = await loadGeoJsonRawUrl(gistId);
+    const geojson = await fetch(rawUrl).then(r => r.json());
+
+    if (geoLayer) map.removeLayer(geoLayer);
+
+    // --- FIXED RENDERING ---
+    geoLayer = L.geoJSON(geojson, {
+
+      // Style for lines & polygons
+      style: function (feature) {
+        return {
+          color: "#3388ff",
+          weight: 2,
+          fillOpacity: 0.3
+        };
+      },
+
+      // Proper point rendering
+      pointToLayer: function (feature, latlng) {
+        return L.circleMarker(latlng, {
+          radius: 4,
+          fillColor: "#ff7800",
+          color: "#000",
+          weight: 1,
+          opacity: 1,
+          fillOpacity: 0.8
+        });
+      },
+
+      // Optional popup
+      onEachFeature: function (feature, layer) {
+        if (feature.properties) {
+          layer.bindPopup(JSON.stringify(feature.properties, null, 2));
+        }
       }
 
-      // Initialize map if not already
-      if (!map) {
-        map = L.map("map").setView([0,0], 2);
+    }).addTo(map);
 
-        // Free OpenStreetMap tiles
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          maxZoom: 19,
-          attribution: ''
-        }).addTo(map);
-      }
+    map.fitBounds(geoLayer.getBounds());
 
-      try {
-        const rawUrl = await loadGeoJsonRawUrl(gistId);
-        const geojson = await fetch(rawUrl).then(r => r.json());
+  } catch (err) {
+    alert("Error: " + err.message);
+    console.error(err);
+  }
+}
 
-        // Remove previous layer if it exists
-        if (geoLayer) map.removeLayer(geoLayer);
-
-        // Add GeoJSON layer and store reference globally
-        geoLayer = L.geoJSON(geojson).addTo(map);
-        map.fitBounds(geoLayer.getBounds());
-      } catch (err) {
-        alert("Error loading GeoJSON: " + err.message);
-        console.error(err);
-      }
-    }
-
-    // Wait for Leaflet to load
-    if (window.L) {
-      window.onload = initMap;
-    } else {
-      console.error("Leaflet did not load properly.");
-    }
-  </script>
+window.onload = initMap;
+</script>
 </body>
 </html>
