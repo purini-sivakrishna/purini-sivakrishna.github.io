@@ -14,7 +14,7 @@
     html, body { margin: 0; height: 100%; width: 100%; }
     #map { height: 100vh; width: 100vw; }
 
-    /* 🔥 Overlay text (NOT blocking map) */
+    /* Overlay text (NOT blocking map) */
     #loading {
       position: absolute;
       top: 50%;
@@ -37,9 +37,9 @@
 
 <div id="map"></div>
 
-<!-- 🔥 Text overlay -->
+<!-- Text overlay -->
 <div id="loading">
-  ⏳ Loading map data... Please wait
+  Loading map data... Please wait
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -100,7 +100,7 @@ async function initMap() {
     { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }
   );
 
-  // Create map (shows immediately ✅)
+  // Create map (shows immediately)
   map = L.map("map", {
     center: [20, 0],
     zoom: 2,
@@ -108,10 +108,10 @@ async function initMap() {
   });
 
   const baseMaps = {
-    "🗺️ Road Map": osm,
-    "🛰️ Satellite": satellite,
-    "🌍 Hybrid": hybrid,
-    "⛰️ Terrain": terrain
+    "Road Map": osm,
+    "Satellite": satellite,
+    "Hybrid": hybrid,
+    "Terrain": terrain
   };
 
   L.control.layers(baseMaps).addTo(map);
@@ -140,7 +140,7 @@ async function initMap() {
 
     map.fitBounds(geoLayer.getBounds());
 
-    hideLoader(); // ✅ remove text after load
+    hideLoader(); // remove text after load
 
   } catch (err) {
     hideLoader();
