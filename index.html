@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Advanced GeoJSON Viewer</title>
+  <title>Vetro GeoJSON Viewer</title>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
@@ -14,9 +14,30 @@
   <style>
     html, body { margin: 0; height: 100%; width: 100%; }
     #map { height: 100vh; width: 100vw; }
+
+    /* Loader Style */
+    #loading {
+      position: absolute;
+      z-index: 9999;
+      background: white;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-family: Arial;
+    }
   </style>
 </head>
+
 <body>
+
+<!-- Loading Screen -->
+<div id="loading">
+  Loading map data... Please wait
+</div>
+
 <div id="map"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -24,6 +45,15 @@
 <script>
 let map;
 let geoLayer;
+
+// Loader functions
+function showLoader() {
+  document.getElementById("loading").style.display = "flex";
+}
+
+function hideLoader() {
+  document.getElementById("loading").style.display = "none";
+}
 
 // Extract gist id
 function getGistId() {
@@ -45,9 +75,13 @@ async function loadGeoJsonRawUrl(gistId) {
 
 // Initialize map
 async function initMap() {
+
+  showLoader(); // START LOADING
+
   const gistId = getGistId();
   if (!gistId) {
     alert("Use ?gist=YOUR_GIST_ID");
+    hideLoader();
     return;
   }
 
@@ -90,10 +124,10 @@ async function initMap() {
 
   // Layer control
   const baseMaps = {
-    "🗺️ Road Map": osm,
-    "🛰️ Satellite": satellite,
-    "🌍 Hybrid": hybrid,
-    "⛰️ Terrain": terrain
+    "Road Map": osm,
+    "Satellite": satellite,
+    "Hybrid": hybrid,
+    "errain": terrain
   };
 
   L.control.layers(baseMaps).addTo(map);
@@ -107,7 +141,6 @@ async function initMap() {
     // --- FIXED RENDERING ---
     geoLayer = L.geoJSON(geojson, {
 
-      // Style for lines & polygons
       style: function (feature) {
         return {
           color: "#3388ff",
@@ -116,7 +149,6 @@ async function initMap() {
         };
       },
 
-      // Proper point rendering
       pointToLayer: function (feature, latlng) {
         return L.circleMarker(latlng, {
           radius: 4,
@@ -128,7 +160,6 @@ async function initMap() {
         });
       },
 
-      // Optional popup
       onEachFeature: function (feature, layer) {
         if (feature.properties) {
           layer.bindPopup(JSON.stringify(feature.properties, null, 2));
@@ -139,7 +170,10 @@ async function initMap() {
 
     map.fitBounds(geoLayer.getBounds());
 
+    hideLoader(); // done
+
   } catch (err) {
+    hideLoader(); // ERROR
     alert("Error: " + err.message);
     console.error(err);
   }
@@ -147,5 +181,6 @@ async function initMap() {
 
 window.onload = initMap;
 </script>
+
 </body>
 </html>
