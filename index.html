@@ -14,7 +14,6 @@
     html, body { margin: 0; height: 100%; width: 100%; }
     #map { height: 100vh; width: 100vw; }
 
-    /* Overlay text (NOT blocking map) */
     #loading {
       position: absolute;
       top: 50%;
@@ -37,7 +36,6 @@
 
 <div id="map"></div>
 
-<!-- Text overlay -->
 <div id="loading">
   Loading map data... Please wait
 </div>
@@ -47,19 +45,17 @@
 <script>
 let map;
 let geoLayer;
+let currentGistId = null; // added currentGistId
 
-// Loader control
 function hideLoader() {
   document.getElementById("loading").style.display = "none";
 }
 
-// Extract gist id
 function getGistId() {
   const params = new URLSearchParams(window.location.search);
   return params.get("gist");
 }
 
-// Fetch GeoJSON URL
 async function loadGeoJsonRawUrl(gistId) {
   const res = await fetch(`https://api.github.com/gists/${gistId}`);
   const gist = await res.json();
@@ -71,7 +67,33 @@ async function loadGeoJsonRawUrl(gistId) {
   return geoFile.raw_url;
 }
 
-// Initialize map
+async function loadGeoJson(gistId) {
+  const rawUrl = await loadGeoJsonRawUrl(gistId);
+  const geojson = await fetch(rawUrl).then(r => r.json());
+
+  if (geoLayer) {
+    map.removeLayer(geoLayer); // clear old layer
+  }
+
+  geoLayer = L.geoJSON(geojson, {
+    style: () => ({
+      color: "#3388ff",
+      weight: 2,
+      fillOpacity: 0.3
+    }),
+    pointToLayer: (feature, latlng) =>
+      L.circleMarker(latlng, {
+        radius: 4,
+        fillColor: "#ff7800",
+        color: "#000",
+        weight: 1,
+        fillOpacity: 0.8
+      })
+  }).addTo(map);
+
+  map.fitBounds(geoLayer.getBounds());
+}
+
 async function initMap() {
 
   const gistId = getGistId();
@@ -80,7 +102,8 @@ async function initMap() {
     return;
   }
 
-  // --- Base Layers ---
+  currentGistId = gistId; // track current gist
+
   const osm = L.tileLayer(
     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
   );
@@ -100,7 +123,6 @@ async function initMap() {
     { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }
   );
 
-  // Create map (shows immediately)
   map = L.map("map", {
     center: [20, 0],
     zoom: 2,
@@ -117,38 +139,36 @@ async function initMap() {
   L.control.layers(baseMaps).addTo(map);
 
   try {
-    const rawUrl = await loadGeoJsonRawUrl(gistId);
-    const geojson = await fetch(rawUrl).then(r => r.json());
-
-    if (geoLayer) map.removeLayer(geoLayer);
-
-    geoLayer = L.geoJSON(geojson, {
-      style: () => ({
-        color: "#3388ff",
-        weight: 2,
-        fillOpacity: 0.3
-      }),
-      pointToLayer: (feature, latlng) =>
-        L.circleMarker(latlng, {
-          radius: 4,
-          fillColor: "#ff7800",
-          color: "#000",
-          weight: 1,
-          fillOpacity: 0.8
-        })
-    }).addTo(map);
-
-    map.fitBounds(geoLayer.getBounds());
-
-    hideLoader(); // remove text after load
-
+    await loadGeoJson(gistId);
+    hideLoader();
   } catch (err) {
     hideLoader();
     alert("Error: " + err.message);
   }
 }
 
-window.onload = initMap;
+//detect gist change
+function watchGistChange() {
+  setInterval(async () => {
+    const newGistId = getGistId();
+
+    if (newGistId && newGistId !== currentGistId) {
+      console.log("🔄 Gist changed:", newGistId);
+      currentGistId = newGistId;
+
+      try {
+        await loadGeoJson(newGistId);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  }, 1000);
+}
+
+window.onload = () => {
+  initMap();
+  watchGistChange(); // added
+};
 </script>
 
 </body>
