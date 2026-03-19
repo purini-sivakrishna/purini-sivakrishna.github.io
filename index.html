@@ -20,11 +20,9 @@
       left: 50%;
       transform: translate(-50%, -50%);
       z-index: 9999;
-
-      background: rgba(255,255,255,0.8);
+      background: rgba(255,255,255,0.9);
       padding: 12px 20px;
       border-radius: 8px;
-
       font-size: 16px;
       font-family: Arial;
       box-shadow: 0 2px 10px rgba(0,0,0,0.2);
@@ -45,16 +43,27 @@
 <script>
 let map;
 let geoLayer;
-let currentGistId = null; // added currentGistId
+let currentGistId = null;
+
+// =========================
+// HELPERS
+// =========================
 
 function hideLoader() {
   document.getElementById("loading").style.display = "none";
 }
 
-function getGistId() {
+function getParams() {
   const params = new URLSearchParams(window.location.search);
-  return params.get("gist");
+  return {
+    gist: params.get("gist"),
+    vetroId: params.get("id") // optional filter
+  };
 }
+
+// =========================
+// FETCH GIST DATA
+// =========================
 
 async function loadGeoJsonRawUrl(gistId) {
   const res = await fetch(`https://api.github.com/gists/${gistId}`);
@@ -64,45 +73,83 @@ async function loadGeoJsonRawUrl(gistId) {
     .find(f => f.filename.endsWith(".geojson"));
 
   if (!geoFile) throw new Error("No .geojson found");
+
   return geoFile.raw_url;
 }
 
-async function loadGeoJson(gistId) {
+// =========================
+// LOAD + FILTER DATA
+// =========================
+
+async function loadGeoJson(gistId, vetroId = null) {
+
   const rawUrl = await loadGeoJsonRawUrl(gistId);
   const geojson = await fetch(rawUrl).then(r => r.json());
 
-  if (geoLayer) {
-    map.removeLayer(geoLayer); // clear old layer
+  let filteredGeojson = geojson;
+
+  // 🔥 FILTER BY VETRO ID
+  if (vetroId) {
+    const filtered = geojson.features.filter(
+      f => f.properties?.vetro_id === vetroId
+    );
+
+    filteredGeojson = {
+      type: "FeatureCollection",
+      features: filtered
+    };
   }
 
-  geoLayer = L.geoJSON(geojson, {
+  if (geoLayer) {
+    map.removeLayer(geoLayer);
+  }
+
+  geoLayer = L.geoJSON(filteredGeojson, {
+
     style: () => ({
       color: "#3388ff",
-      weight: 2,
+      weight: 3,
       fillOpacity: 0.3
     }),
+
     pointToLayer: (feature, latlng) =>
       L.circleMarker(latlng, {
-        radius: 4,
+        radius: 5,
         fillColor: "#ff7800",
         color: "#000",
         weight: 1,
-        fillOpacity: 0.8
-      })
+        fillOpacity: 0.9
+      }),
+
+    onEachFeature: (feature, layer) => {
+      const vid = feature.properties?.vetro_id || "N/A";
+
+      layer.bindPopup(`
+        <b>Vetro ID:</b> ${vid}
+      `);
+    }
+
   }).addTo(map);
 
-  map.fitBounds(geoLayer.getBounds());
+  if (geoLayer.getBounds().isValid()) {
+    map.fitBounds(geoLayer.getBounds());
+  }
 }
+
+// =========================
+// INIT MAP
+// =========================
 
 async function initMap() {
 
-  const gistId = getGistId();
-  if (!gistId) {
+  const { gist, vetroId } = getParams();
+
+  if (!gist) {
     alert("Use ?gist=YOUR_GIST_ID");
     return;
   }
 
-  currentGistId = gistId; // track current gist
+  currentGistId = gist;
 
   const osm = L.tileLayer(
     'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -118,28 +165,20 @@ async function initMap() {
     { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }
   );
 
-  const terrain = L.tileLayer(
-    'https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',
-    { maxZoom: 20, subdomains: ['mt0','mt1','mt2','mt3'] }
-  );
-
   map = L.map("map", {
     center: [20, 0],
     zoom: 2,
     layers: [osm]
   });
 
-  const baseMaps = {
+  L.control.layers({
     "Road Map": osm,
     "Satellite": satellite,
-    "Hybrid": hybrid,
-    "Terrain": terrain
-  };
-
-  L.control.layers(baseMaps).addTo(map);
+    "Hybrid": hybrid
+  }).addTo(map);
 
   try {
-    await loadGeoJson(gistId);
+    await loadGeoJson(gist, vetroId);
     hideLoader();
   } catch (err) {
     hideLoader();
@@ -147,27 +186,35 @@ async function initMap() {
   }
 }
 
-//detect gist change
+// =========================
+// AUTO GIST CHANGE DETECTION
+// =========================
+
 function watchGistChange() {
   setInterval(async () => {
-    const newGistId = getGistId();
 
-    if (newGistId && newGistId !== currentGistId) {
-      console.log("🔄 Gist changed:", newGistId);
-      currentGistId = newGistId;
+    const { gist, vetroId } = getParams();
+
+    if (gist && gist !== currentGistId) {
+      currentGistId = gist;
 
       try {
-        await loadGeoJson(newGistId);
+        await loadGeoJson(gist, vetroId);
       } catch (err) {
         console.error(err);
       }
     }
+
   }, 1000);
 }
 
+// =========================
+// START
+// =========================
+
 window.onload = () => {
   initMap();
-  watchGistChange(); // added
+  watchGistChange();
 };
 </script>
 
