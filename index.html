@@ -121,18 +121,47 @@ async function loadGeoJson(gistId, vetroId = null) {
         fillOpacity: 0.9
       }),
 
+    // 🔥 IMPORTANT PART (HOVER + CLICK + HIGHLIGHT)
     onEachFeature: (feature, layer) => {
-      const vid = feature.properties?.vetro_id || "N/A";
 
+      const vetroId = feature.properties?.vetro_id || "N/A";
+
+      // ✅ Tooltip on hover
+      layer.bindTooltip(
+        `Vetro ID: ${vetroId}`,
+        {
+          sticky: true,
+          direction: "top",
+          opacity: 0.9
+        }
+      );
+
+      // ✅ Popup on click
       layer.bindPopup(`
-        <b>Vetro ID:</b> ${vid}
+        <div style="font-size:14px">
+          <b>Vetro ID:</b><br/>
+          ${vetroId}
+        </div>
       `);
+
+      // ✅ Highlight on hover
+      layer.on("mouseover", function () {
+        this.setStyle({
+          color: "red",
+          weight: 5,
+          fillOpacity: 0.6
+        });
+      });
+
+      layer.on("mouseout", function () {
+        geoLayer.resetStyle(this);
+      });
     }
 
   }).addTo(map);
 
   if (geoLayer.getBounds().isValid()) {
-    map.fitBounds(geoLayer.getBounds());
+    map.fitBounds(geoLayer.getBounds(), { padding: [50, 50] });
   }
 }
 
@@ -170,6 +199,9 @@ async function initMap() {
     zoom: 2,
     layers: [osm]
   });
+
+  // 👉 Cursor pointer
+  map.getContainer().style.cursor = "pointer";
 
   L.control.layers({
     "Road Map": osm,
